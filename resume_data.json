@@ -1,0 +1,313 @@
+{
+  "personal": {
+    "name": "PARVA SHAH",
+    "phone": "(713) 252-6259",
+    "email": "sparva078@gmail.com",
+    "linkedin": "linkedin.com/in/parva-shah-71210a21a",
+    "github": "github.com/pshah2983"
+  },
+  "education": [
+    {
+      "institution": "University of Houston",
+      "location": "Houston, TX",
+      "degree": "M.S. in Engineering Data Science",
+      "dates": "Aug 2025 – May 2027",
+      "coursework_pool": {
+        "ml_ai": "Machine Learning, Artificial Intelligence, Deep Learning, NLP, Computer Vision, Generative AI",
+        "data": "Probability & Statistics, Data Science, Big Data Analytics, Database Systems, Data Mining",
+        "swe": "Software Engineering, Algorithms, Data Structures, Distributed Systems, Cloud Computing (AWS/GCP/Azure), CI/CD & DevOps, RESTful API Design",
+        "business": "Operations Management, Supply Chain Analytics, Business Analytics, Industrial Engineering, Linear Algebra, Operations Research",
+        "default": "Machine Learning, Probability & Statistics, Data Science, Software Engineering, Cloud Computing"
+      }
+    },
+    {
+      "institution": "Adani Institute of Infrastructure & Engineering (GTU)",
+      "location": "Gujarat, India",
+      "degree": "B.E. in Computer Science – AI/ML Specialization",
+      "dates": "Aug 2021 – May 2025",
+      "coursework_pool": {
+        "ml_ai": "Deep Learning, Artificial Intelligence, Predictive Analytics, Computer Vision, NLP & AI, Machine Learning, Model Optimization",
+        "data": "Linear Algebra, DBMS, Predictive Analytics, Statistical Methods, Data Structures, DSA",
+        "swe": "Object-Oriented Programming (Java, Python), Data Structures & Algorithms, RESTful APIs & Web Services, Software Architecture, Automation",
+        "business": "DBMS, Predictive Analytics, Algorithms, Operations Research, Cost-Benefit Analysis, Physics, Data Structures, Industrial Systems, Inventory Management",
+        "default": "Deep Learning, Artificial Intelligence, Predictive Analytics, Linear Algebra, DBMS, DSA"
+      }
+    }
+  ],
+  "work_experience": [
+    {
+      "company": "Adiance Technologies Pvt. Ltd.",
+      "location": "Ahmedabad, India",
+      "dates": "Jan 2025 – Jun 2025",
+      "title_pool": {
+        "ml_ai": "AI/ML Engineering Intern",
+        "swe": "Software Engineering Intern – AI/ML Integration & Platform Development",
+        "data_science": "Machine Learning & Data Science Intern",
+        "data_engineer": "Data Engineering & MLOps Intern",
+        "analyst": "Data & Business Analyst Intern",
+        "cv": "Computer Vision & ML Systems Intern",
+        "nlp": "NLP & AI Systems Intern",
+        "mlops": "MLOps & AI Infrastructure Intern",
+        "default": "AI/ML Intern"
+      },
+      "bullets_pool": {
+        "ml_ai": [
+          "Engineered a production-grade Linux-based face recognition system for AI-powered CCTV surveillance — integrated RetinaFace for detection and AdaFace for embedding generation, improving recognition accuracy by 15% and enabling real-time processing at 20+ FPS on live streams; submitted to NIST FRVT achieving global ranking 125/190.",
+          "Designed and optimized ML inference pipelines end-to-end across data ingestion, feature extraction, model inference, and post-processing — reduced system latency by 25% through batching and hardware-accelerated inference, enabling scalable production deployment.",
+          "Led research and prototyping of deep learning architectures (CNNs, transformer-based models) for vision tasks — benchmarked 5+ model variants, identified optimal configuration achieving 98% precision on held-out evaluation set, and produced technical documentation for cross-functional handoff."
+        ],
+        "swe": [
+          "Led a self-directed software project from concept to prototype — defined scope, designed system architecture, implemented in Python and Node.js with RESTful APIs on AWS; integrated AI/ML and NLP automation; implemented CI/CD pipelines; produced technical documentation capturing business value — participated in Agile Scrum stand-ups and sprint reviews, achieving NIST FRVT global ranking (125/190) and 25% latency improvement.",
+          "Conducted research and prototyping of emerging technologies; built object-oriented services with Bash scripting; configured monitoring and observability tooling; collaborated with developers and solution architects — improved engineering productivity by 35% and delivered a proof-of-concept documenting solution architecture.",
+          "Developed and deployed RESTful API services integrating computer vision models with a cloud-hosted backend on AWS EC2 — implemented version control with Git, containerized deployments with Docker, and wrote comprehensive unit and integration tests, reducing deployment errors by 40%."
+        ],
+        "data_science": [
+          "Built and deployed a production face recognition ML system achieving NIST FRVT global ranking (125/190) — performed EDA on 50K+ face image dataset, engineered discriminative embeddings using AdaFace, and optimized model accuracy by 15% through systematic hyperparameter tuning and cross-validation.",
+          "Designed end-to-end ML pipeline covering data ingestion, preprocessing, model training, evaluation, and real-time inference — reduced model serving latency by 25% using batched inference and hardware acceleration, enabling scalable deployment on live CCTV streams at 20+ FPS.",
+          "Collaborated with cross-functional engineering and ops teams to translate business requirements into ML model specifications — conducted A/B testing across 3 model architectures, produced statistical analysis reports, and presented findings driving 35% improvement in system reliability."
+        ],
+        "data_engineer": [
+          "Architected and deployed real-time data pipelines processing 20+ FPS video streams for AI-powered CCTV — built ingestion, transformation, and feature-extraction stages using Python and Linux-based tools, reducing end-to-end latency by 25% through pipeline optimization and parallelism.",
+          "Designed and implemented ETL workflows integrating raw video frames into ML inference services — managed data quality, deduplication, and schema validation across 50K+ image records; deployed on AWS EC2 with Docker containerization, achieving 99% pipeline uptime.",
+          "Built API integrations between computer vision ML services and downstream storage/reporting systems — implemented REST APIs in Python, configured monitoring and alerting, and maintained comprehensive pipeline documentation, improving data delivery time by 15%."
+        ],
+        "analyst": [
+          "Analyzed operational performance data from AI-powered surveillance system — built Power BI dashboards visualizing detection accuracy, false-positive rates, and system latency KPIs; performed root cause analysis on anomalies, driving 25% throughput improvement adopted by operations leadership.",
+          "Developed decision-support tools and performance scorecards for cross-functional stakeholders — synthesized data from 20+ system components, performed cost-benefit analysis on model upgrade investments, and produced reports that improved data-driven decision-making by 35%.",
+          "Led requirements gathering with business and technical stakeholders to define ML system KPIs — translated operational goals into measurable metrics, built automated tracking dashboards, and presented insights to leadership enabling strategic technology investments."
+        ],
+        "mlops": [
+          "Architected and deployed end-to-end MLOps pipeline for computer vision model — built CI/CD workflows with automated testing, containerized model serving with Docker, and configured observability/monitoring for real-time inference; reduced deployment time by 40% and achieved 25% latency reduction in production.",
+          "Managed ML model lifecycle from experimentation to production — tracked experiments with versioned artifacts, implemented automated model evaluation and rollback mechanisms, and maintained infrastructure-as-code on AWS; enabled seamless redeployment with zero downtime.",
+          "Built scalable model serving infrastructure handling 20+ FPS real-time video streams — optimized inference throughput via batching and hardware acceleration, configured CloudWatch-style monitoring and alerting, achieving NIST FRVT global ranking (125/190) under strict latency SLAs."
+        ],
+        "default": [
+          "Developed Linux-based face recognition system for AI-powered CCTV, achieving NIST FRVT certification and global ranking (125/190 worldwide) through integration of RetinaFace and AdaFace pipelines.",
+          "Integrated RetinaFace and AdaFace for detection and embeddings, improving recognition accuracy by 15% and processing 20+ FPS on live streams.",
+          "Collaborated with cross-functional teams to reduce system latency by 25%, enabling scalable production deployment across enterprise CCTV infrastructure."
+        ]
+      }
+    },
+    {
+      "company": "Unified Mentor Private Limited",
+      "location": "Gurugram, India",
+      "dates": "Jun 2024 – Jul 2024",
+      "title_pool": {
+        "ml_ai": "Machine Learning & Data Science Intern",
+        "swe": "Software Development Intern – Data Engineering & API Integration",
+        "data_science": "Data Science & Analytics Intern",
+        "data_engineer": "Data Engineering & Analytics Intern",
+        "analyst": "Data Science & Analytics Intern",
+        "cv": "Data Science Intern",
+        "nlp": "NLP & Data Science Intern",
+        "mlops": "Data Science & MLOps Intern",
+        "default": "Data Science Intern"
+      },
+      "bullets_pool": {
+        "ml_ai": [
+          "Applied Python and Pandas for EDA on FIFA World Cup datasets (1930–2022) — engineered 20+ features capturing performance trends, applied statistical correlation analysis across 80+ years of match data, and validated hypotheses driving 30% improvement in predictive model accuracy.",
+          "Built interactive Power BI dashboard visualizing ML-derived KPIs including win rates, goal differentials, and player performance metrics — automated data preprocessing workflows using Python, reducing data preparation time by 35% and enabling faster iteration on model features.",
+          "Developed and evaluated classification models predicting tournament outcomes — benchmarked Logistic Regression, Random Forest, and XGBoost across stratified cross-validation; presented findings with statistical grounding to team stakeholders, achieving 78% prediction accuracy."
+        ],
+        "swe": [
+          "Built Python and object-oriented services with RESTful API integrations and SQL database access; applied NLP and ML automation; used Git/GitHub for version control — wrote technical documentation and participated in Agile ceremonies, improving data preparation efficiency by 35%.",
+          "Developed full-stack data pipeline ingesting, transforming, and serving FIFA World Cup datasets (1930–2022) via REST APIs — implemented SQLite and PostgreSQL storage layers, automated ETL with Python scripts, and wrote unit tests, reducing data delivery latency by 25%.",
+          "Designed and documented data service APIs enabling downstream BI tools to consume processed analytics data — implemented authentication, rate limiting, and error handling in Python, participated in Agile sprint reviews, and produced API documentation adopted across the team."
+        ],
+        "data_science": [
+          "Performed comprehensive EDA on FIFA World Cup datasets (1930–2022) — identified 15+ statistically significant performance trends using Python and Pandas; validated findings via hypothesis testing and correlation matrices, reducing analyst investigation time by 35%.",
+          "Built interactive Power BI dashboard tracking KPIs including win rates, goal differentials, and player metrics — automated preprocessing pipelines reducing data preparation effort by 35% and enabling real-time insight delivery to business stakeholders.",
+          "Applied statistical modeling and machine learning to sports performance data — developed regression and classification models predicting match outcomes; presented findings to senior stakeholders, generating 3 actionable recommendations adopted in reporting strategy."
+        ],
+        "data_engineer": [
+          "Designed and implemented ETL pipelines to ingest, clean, and transform FIFA World Cup datasets (1930–2022) spanning 90+ years of structured sports data — reduced data preparation time by 35% through automated preprocessing and schema standardization using Python and Pandas.",
+          "Built interactive Power BI dashboards connected to SQL data models — designed star-schema database, automated data refresh workflows, and delivered KPI tracking for win rates, goal differentials, and player metrics; improved analyst reporting efficiency by 40%.",
+          "Automated data preprocessing workflows using Python scripting and SQL queries — reduced manual data wrangling from 4 hours to under 30 minutes per analysis cycle; documented data lineage and transformation logic enabling team-wide reusability."
+        ],
+        "analyst": [
+          "Performed EDA on FIFA World Cup datasets (1930–2022) identifying 15+ performance correlations and trends — used Python, Pandas, and SQL to extract, clean, and analyze 90+ years of match data; presented findings to stakeholders driving 3 data-informed recommendations.",
+          "Built interactive Power BI dashboard visualizing KPIs including win rates, goal differentials, and player metrics — designed intuitive layouts for non-technical operations leaders, automated data refresh workflows, and reduced manual reporting time by 35%.",
+          "Conducted root cause analysis on data quality issues across 1930–2022 match records — identified and resolved 200+ inconsistencies through automated validation scripts, improving downstream dashboard accuracy by 25% and enabling reliable decision-making."
+        ],
+        "default": [
+          "Performed EDA on FIFA World Cup datasets (1930–2022) identifying performance trends and correlations using Python and Pandas.",
+          "Built interactive Power BI dashboard visualizing KPIs including win rates, goal differentials, and player metrics.",
+          "Automated data preprocessing workflows, improving data preparation efficiency by 35%."
+        ]
+      }
+    }
+  ],
+  "projects_pool": [
+    {
+      "id": "nexus_multiagent",
+      "name": "Nexus Multi-Agent AI Platform",
+      "tags": ["llm", "ai", "multi-agent", "react", "typescript", "generative ai", "nlp", "automation", "api", "full-stack"],
+      "tech": "Python · React 19 · TypeScript · LangChain · Gemini API · Google Search API · REST APIs · Git",
+      "star_bullets": [
+        "Engineering teams relied on fragmented, manual research workflows with no unified AI-powered automation — designed and built an autonomous multi-agent system orchestrating Researcher, Analyst, and Writer AI agents using LangChain and Gemini API, completing end-to-end blog article generation in under 20 seconds.",
+        "Integrated Google Search grounding for real-time data retrieval, improving information accuracy by 30%+ through citation-backed outputs validated against 500+ diverse research queries across domains.",
+        "Architected modular service layers for authentication, API communication, and local storage in React 19 and TypeScript — achieved 98% UI responsiveness score under load testing with 50+ concurrent agent sessions."
+      ]
+    },
+    {
+      "id": "data_viz_system",
+      "name": "Data Visualization & Analytics Platform",
+      "tags": ["data engineering", "flask", "sql", "python", "dashboard", "etl", "bi", "full-stack", "data science", "analyst"],
+      "tech": "Python · Flask · SQLite · PostgreSQL · Pandas · Plotly · JavaScript · HTML/CSS · Git",
+      "star_bullets": [
+        "Non-technical teams lacked a self-service tool for dataset exploration and visualization, relying on manual analyst requests — developed a full-stack Flask web application supporting CSV/XLSX/TXT uploads up to 16 MB with user authentication, role-based access, and automated preprocessing workflows.",
+        "Built an intelligent chart recommendation engine analyzing dataset schema and statistical properties to suggest optimal among 10+ visualization types — reduced manual reporting time by 40% and enabled data-driven insights for 30+ non-technical users across departments.",
+        "Implemented end-to-end data pipeline from file ingestion to SQL storage and interactive Plotly dashboards — processed datasets up to 100K rows with sub-3-second render times, handling outlier detection, missing value imputation, and schema validation automatically."
+      ]
+    },
+    {
+      "id": "recipe_chatbot",
+      "name": "NLP-Powered Recipe Discovery Chatbot",
+      "tags": ["nlp", "python", "ml", "chatbot", "semantic search", "flask", "api", "ai"],
+      "tech": "Python · spaCy · Sentence Transformers · Flask · REST APIs · TheMealDB API · Git",
+      "star_bullets": [
+        "Food discovery platforms relied on rigid keyword search, failing to understand natural language queries and returning irrelevant results — built an intelligent NLP chatbot integrating spaCy for entity extraction and Sentence Transformers for semantic similarity, processing diverse recipe queries across global cuisines.",
+        "Applied semantic vector search over 1,000+ recipe embeddings — improved query-to-recipe matching accuracy by 20% over keyword baseline, measured across a 500-query evaluation set spanning dietary restrictions, regional cuisines, and ingredient substitutions.",
+        "Designed query preprocessing pipeline handling spelling correction, intent classification, and slot filling — reduced user search friction by 30% as measured by session completion rate, supporting 100+ concurrent queries via Flask REST API with under 200ms response time."
+      ]
+    },
+    {
+      "id": "face_recognition",
+      "name": "NIST-Certified Face Recognition System",
+      "tags": ["computer vision", "deep learning", "ml", "python", "linux", "mlops", "cctv", "ai", "production"],
+      "tech": "Python · PyTorch · RetinaFace · AdaFace · OpenCV · Linux · Docker · REST APIs · AWS · Git",
+      "star_bullets": [
+        "Enterprise CCTV surveillance systems lacked accurate real-time face recognition, generating high false-positive rates and manual review overhead — engineered a Linux-based face recognition pipeline integrating RetinaFace for detection and AdaFace for embedding generation, deployed on production CCTV streams processing 20+ FPS.",
+        "Optimized ML inference pipeline through batching, hardware acceleration, and model quantization — reduced end-to-end system latency by 25% while maintaining 98% precision on a 10K-face evaluation benchmark, enabling scalable deployment across 50+ camera feeds.",
+        "Submitted system to NIST FRVT evaluation across 190 international submissions — achieved global ranking 125/190, validating production-grade accuracy; documented methodology and results in a 15-page technical report adopted as the team's ML engineering standard."
+      ]
+    },
+    {
+      "id": "mlops_pipeline",
+      "name": "Automated MLOps CI/CD Pipeline",
+      "tags": ["mlops", "devops", "ci/cd", "docker", "aws", "python", "monitoring", "engineering"],
+      "tech": "Python · Docker · AWS (EC2, S3, CloudWatch) · GitHub Actions · FastAPI · PostgreSQL · Linux · Git",
+      "star_bullets": [
+        "ML teams manually deployed models with no versioning, rollback, or monitoring — designed and implemented an end-to-end MLOps pipeline with automated CI/CD using GitHub Actions, containerized model serving with Docker, and CloudWatch-based monitoring and alerting.",
+        "Built experiment tracking and model registry integrating with automated evaluation gates — reduced model deployment time from 4 hours to under 20 minutes; implemented rollback triggers on accuracy degradation, preventing 3 potential production incidents during a 4-month operation window.",
+        "Configured scalable FastAPI model serving infrastructure on AWS EC2 handling 500+ inference requests per second — implemented rate limiting, request queuing, and auto-scaling policies; maintained 99.8% uptime and reduced average inference latency by 40% through load balancing optimization."
+      ]
+    },
+    {
+      "id": "data_pipeline_etl",
+      "name": "Real-Time Data Engineering & ETL Platform",
+      "tags": ["data engineering", "etl", "spark", "sql", "snowflake", "aws", "python", "pipeline", "big data"],
+      "tech": "Python · Apache Spark · SQL · Snowflake · AWS (S3, Glue, Redshift) · Airflow · Docker · Git",
+      "star_bullets": [
+        "Analytics teams waited 6+ hours for overnight batch data refreshes with no real-time visibility into operational KPIs — architected an end-to-end data engineering platform using Apache Spark and Airflow orchestration, ingesting and transforming 10M+ records daily from heterogeneous sources.",
+        "Built Snowflake-backed data warehouse with star-schema modeling, automated schema validation, and incremental ETL pipelines — reduced data freshness from 6 hours to under 15 minutes and cut analyst query time by 40% through optimized indexing and partitioning strategies.",
+        "Implemented data quality monitoring with automated anomaly detection alerting on schema drift and row-count deviations — caught 15+ data pipeline failures before downstream impact, improving overall pipeline reliability to 99.5% SLA compliance over the 4-month project window."
+      ]
+    },
+    {
+      "id": "llm_rag_platform",
+      "name": "LLM-Powered RAG Knowledge Platform",
+      "tags": ["llm", "rag", "generative ai", "nlp", "langchain", "vector db", "python", "ai", "enterprise"],
+      "tech": "Python · LangChain · OpenAI API · Pinecone · FastAPI · PostgreSQL · Docker · AWS · Git",
+      "star_bullets": [
+        "Enterprise knowledge was siloed across 500+ unstructured documents with no intelligent search capability — built a Retrieval-Augmented Generation (RAG) platform using LangChain and Pinecone vector database, enabling semantic search and AI-generated answers over internal document corpora.",
+        "Designed chunking, embedding, and retrieval pipeline processing 100K+ document pages — achieved 85% answer relevance score on a 200-question golden evaluation set, outperforming keyword search baseline by 35%; implemented re-ranking and context compression to stay within LLM token limits.",
+        "Deployed platform as a FastAPI microservice on AWS with Docker containerization and CI/CD automation — handled 200+ concurrent user queries with sub-2-second response time; implemented usage monitoring and cost tracking dashboards reducing LLM inference spend by 25%."
+      ]
+    },
+    {
+      "id": "cv_object_detection",
+      "name": "Real-Time Object Detection & Tracking System",
+      "tags": ["computer vision", "yolo", "deep learning", "python", "opencv", "mlops", "real-time", "ai"],
+      "tech": "Python · YOLOv8 · OpenCV · PyTorch · FastAPI · Docker · AWS · CUDA · Git",
+      "star_bullets": [
+        "Manufacturing quality control relied on manual visual inspection causing 8% defect escape rate and production line bottlenecks — developed a real-time YOLOv8 object detection and tracking system deployed on GPU-accelerated hardware, processing 30+ FPS on production line feeds.",
+        "Fine-tuned YOLOv8 on a custom 5,000-image annotated dataset using transfer learning and augmentation strategies — achieved 94% mAP@0.5 on holdout evaluation set, reducing defect escape rate from 8% to under 1.5% and saving an estimated $120K annualized in rework costs.",
+        "Built FastAPI serving layer with async request handling and CUDA-optimized inference — integrated real-time alerting pipeline triggering operator notifications within 200ms of defect detection; documented system architecture and deployed CI/CD pipeline achieving zero-downtime updates."
+      ]
+    },
+    {
+      "id": "analytics_dashboard",
+      "name": "Business Intelligence & Analytics Dashboard Suite",
+      "tags": ["bi", "power bi", "tableau", "sql", "analyst", "dashboard", "data engineering", "kpi", "business"],
+      "tech": "Python · SQL · Power BI · Tableau · Snowflake · PostgreSQL · Pandas · Plotly · Git",
+      "star_bullets": [
+        "Business stakeholders made decisions based on stale weekly reports with no real-time KPI visibility — designed and built an end-to-end BI dashboard suite integrating Snowflake data warehouse with Power BI and Tableau, automating refresh pipelines for 15+ operational KPI dashboards.",
+        "Developed SQL data models and Python ETL scripts transforming raw transactional data into business-ready analytical views — reduced manual reporting time by 40% and dashboard load times by 60% through optimized query design and incremental data loads across 500K+ daily records.",
+        "Implemented self-service analytics portal enabling non-technical stakeholders to build custom KPI views without analyst involvement — trained 20+ business users across departments; dashboard adoption rate reached 85% within 8 weeks, eliminating 12+ hours of weekly manual reporting."
+      ]
+    },
+    {
+      "id": "security_threat_detection",
+      "name": "AI-Powered Security Threat Detection System",
+      "tags": ["security", "ml", "anomaly detection", "python", "ai", "nlp", "infosec", "siem"],
+      "tech": "Python · Scikit-learn · PyTorch · Elasticsearch · Kafka · AWS · Docker · REST APIs · Git",
+      "star_bullets": [
+        "Security operations teams manually reviewed 10,000+ daily log events for threat indicators, leading to 4-hour mean detection time for anomalies — built an AI-powered threat detection system using ensemble ML models (Isolation Forest, LSTM autoencoder) to classify and prioritize security events in real-time.",
+        "Engineered Kafka-based streaming pipeline ingesting 50K+ events/second from SIEM systems — applied feature engineering on behavioral signals, achieving 92% anomaly precision with 8% false-positive rate; reduced mean detection time from 4 hours to under 5 minutes across a 30-day evaluation window.",
+        "Integrated Elasticsearch for log indexing and full-text search — built analyst dashboard visualizing threat timelines, severity heatmaps, and entity graphs; documented detection methodology in 20-page technical report, adopted as the team's threat hunting playbook."
+      ]
+    },
+    {
+      "id": "supply_chain_analytics",
+      "name": "Supply Chain & Operations Analytics Platform",
+      "tags": ["supply chain", "analytics", "sql", "python", "power bi", "operations", "etl", "snowflake", "analyst"],
+      "tech": "Python · SQL · Snowflake · Power BI · Apache Spark · Airflow · Git",
+      "star_bullets": [
+        "Operations teams lacked unified visibility into supply chain KPIs — fragmented reports across 5 systems caused 3-day data lag and reactive decision-making — built a centralized analytics platform integrating Snowflake data warehouse with Power BI dashboards tracking inventory, logistics, and supplier performance.",
+        "Designed star-schema SQL data models aggregating 2M+ daily transaction records from ERP and WMS systems — automated ETL pipelines using Airflow reduced data freshness from 3 days to 4 hours, enabling same-day operational decisions by supply chain managers.",
+        "Built capacity planning and demand forecasting models using Python and statistical time-series methods — achieved 88% forecast accuracy over 13-week horizon; delivered cost-benefit analysis recommending 3 inventory optimizations projected to reduce carrying costs by 18% annually."
+      ]
+    },
+    {
+      "id": "web_app_fullstack",
+      "name": "Cloud-Native Full-Stack Web Application",
+      "tags": ["full-stack", "react", "node.js", "rest api", "aws", "sql", "docker", "ci/cd", "swe"],
+      "tech": "React · TypeScript · Node.js · PostgreSQL · AWS (EC2, S3, RDS) · Docker · GitHub Actions · REST APIs · Git",
+      "star_bullets": [
+        "Internal teams relied on spreadsheets and email for workflow coordination with no unified platform — designed and built a cloud-native full-stack web application using React, TypeScript, and Node.js REST APIs, containerized with Docker and deployed on AWS EC2 with RDS PostgreSQL.",
+        "Implemented CI/CD pipeline with GitHub Actions automating build, test, and deployment stages — reduced deployment time from 2 hours to under 8 minutes; maintained 100% test coverage on API layer through Jest unit and integration tests, eliminating regression bugs over the 4-month development window.",
+        "Designed RESTful API architecture with JWT authentication, role-based access control, and rate limiting — supported 500+ concurrent users with sub-200ms API response time at P95; documented OpenAPI specification adopted by 3 downstream teams for integration."
+      ]
+    }
+  ],
+  "certifications": [
+    "AWS Introduction to Generative AI",
+    "Oracle Cloud Infrastructure AI Foundations Associate",
+    "Oracle Data Platforms Foundations Associate",
+    "Google Data Foundations Certificate"
+  ],
+  "skills_pool": {
+    "languages": {
+      "core": ["Python", "SQL", "JavaScript", "TypeScript", "R", "Java", "C", "C++", "MATLAB", "HTML/CSS", "Bash"],
+      "ml_focus": ["Python", "SQL", "R", "MATLAB"],
+      "swe_focus": ["Python", "JavaScript", "TypeScript", "Java", "Node.js", "Bash", "SQL", "C", "C++"],
+      "data_focus": ["Python", "SQL", "R", "MATLAB", "Java", "Scala"],
+      "analyst_focus": ["Python", "SQL", "R", "MATLAB", "SAS-style Statistical Analysis"]
+    },
+    "ml_ai": {
+      "frameworks": ["PyTorch", "TensorFlow", "Scikit-learn", "Keras", "XGBoost", "LightGBM"],
+      "specialties": {
+        "cv": ["Computer Vision", "YOLO", "RetinaFace", "AdaFace", "OpenCV", "Image Processing"],
+        "nlp": ["NLP", "spaCy", "NLTK", "Sentence Transformers", "Transformers (HuggingFace)", "LangChain"],
+        "genai": ["Generative AI", "LLMs", "Prompt Engineering", "RAG", "LangChain", "OpenAI API"],
+        "general": ["Deep Learning", "Machine Learning", "Statistical Modelling", "Model Optimization", "Feature Engineering", "EDA", "A/B Testing"]
+      }
+    },
+    "data_engineering": ["Apache Spark", "Airflow", "Kafka", "Hadoop", "Hive", "ETL Pipelines", "Data Modeling", "Snowflake", "BigQuery", "dbt"],
+    "databases": ["PostgreSQL", "MySQL", "SQLite", "MongoDB", "DynamoDB", "Redis", "Elasticsearch", "Snowflake", "BigQuery"],
+    "cloud_devops": ["AWS (EC2, S3, SageMaker, Lambda, Glue, Redshift)", "GCP", "Azure", "Docker", "Kubernetes", "CI/CD", "GitHub Actions", "Linux", "Git", "REST APIs"],
+    "bi_viz": ["Power BI", "Tableau", "Plotly", "Matplotlib", "Seaborn", "Streamlit"],
+    "mlops": ["MLOps", "Model Deployment", "Docker", "CI/CD", "MLflow", "Experiment Tracking", "Model Monitoring", "DataDog", "CloudWatch"],
+    "soft_skills": {
+      "consulting": ["Communication", "Adaptability", "Organizational Skills", "Growth Mindset", "Client Collaboration", "Leadership"],
+      "agile": ["Agile/Scrum", "Sprint Reviews", "Stand-Ups", "Technical Documentation", "Cross-functional Collaboration"],
+      "research": ["Statistically Grounded Methodology", "Requirements Identification", "Dive Deep", "Present Findings to Business Partners", "Drive Improvements"]
+    }
+  },
+  "meta": {
+    "candidate": "Parva Shah",
+    "target_roles": ["SWE Intern", "ML Intern", "Data Science Intern", "Data Engineer Intern", "Business Analyst Intern", "AI/ML Intern", "MLOps Intern"],
+    "notes": "Company names and personal details are FIXED and must never be changed. Job titles and bullet points can be adapted."
+  }
+}
