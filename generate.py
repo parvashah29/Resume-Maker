@@ -9,10 +9,11 @@ Usage:
     python3 generate.py --jd jd.txt --no-ai   # rule-based only (faster, no LLM)
 
 Output:
-    output/Parva_Shah_<Company>_<Role>.pdf
+    output/<Name>_<Company>_<Role>.pdf
 """
 import argparse
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -21,17 +22,24 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from modules.jd_parser import parse_jd, sanitize_filename
-from modules.content_selector import select_all
+from modules.content_selector import select_all, build_fallback_summary
 from modules.pdf_renderer import render_pdf
 
 
 OUTPUT_DIR = Path(__file__).parent / "output"
 
 
+MIN_JD_CHARS = 40       # shorter than this is almost certainly not a job description
+
+
 def read_jd(jd_arg: str) -> str:
     """Accept JD as a file path or raw text string."""
-    if os.path.isfile(jd_arg):
-        with open(jd_arg, "r", encoding="utf-8") as f:
+    try:
+        is_file = os.path.isfile(jd_arg)
+    except (OSError, ValueError):      # very long raw text can't be a path
+        is_file = False
+    if is_file:
+        with open(jd_arg, "r", encoding="utf-8", errors="replace") as f:
             return f.read()
     return jd_arg
 
@@ -55,29 +63,37 @@ def interactive_jd() -> str:
     return "\n".join(lines).strip()
 
 
+def _name_prefix() -> str:
+    """Filename prefix from resume_data.json (e.g. 'Parva_Shah_')."""
+    try:
+        from modules.content_selector import _load_data
+        return re.sub(r"[^\w]+", "_", _load_data()["personal"]["name"].title()).strip("_") + "_"
+    except Exception:
+        return "Resume_"
+
+
 def build_output_path(company: str, job_title: str) -> str:
     """Build the output file path: output/Parva_Shah_Company_Role.pdf"""
-    OUTPUT_DIR.mkdir(exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     company_clean = sanitize_filename(company)
     role_clean = sanitize_filename(job_title)
-    filename = f"Parva_Shah_{company_clean}_{role_clean}.pdf"
+    filename = f"{_name_prefix()}{company_clean}_{role_clean}.pdf"
     return str(OUTPUT_DIR / filename)
 
 
 def print_banner():
     print("\n" + "="*60)
     print("  🎯 Resume Tailoring Pipeline — Parva Shah")
-    print("  Local · No API Keys · Powered by Mistral (Ollama)")
+    print("  Local · No API Keys · Powered by a local Ollama model")
     print("="*60)
 
 
 def _print_ats_report(jd_parsed: dict, pdf_path: str):
     """Extract text from generated PDF and report ATS keyword coverage."""
     try:
-        import fitz
-        doc = fitz.open(pdf_path)
-        text = " ".join(page.get_text() for page in doc)
-        doc.close()
+        from pypdf import PdfReader
+        reader = PdfReader(pdf_path)
+        text = " ".join((page.extract_text() or "") for page in reader.pages)
     except Exception:
         return
 
@@ -107,6 +123,8 @@ def main():
                         help="Path to JD text file OR JD text string")
     parser.add_argument("--no-ai", action="store_true",
                         help="Skip Ollama tailoring — use rule-based content selection only (faster)")
+    parser.add_argument("--model", type=str, default=None,
+                        help="Ollama model name (default: $RESUME_MAKER_MODEL or mistral:latest)")
     parser.add_argument("--company", type=str, default=None,
                         help="Override company name (if auto-detection fails)")
     parser.add_argument("--role", type=str, default=None,
@@ -130,8 +148,9 @@ def main():
         else:
             jd_text = interactive_jd()
 
-    if not jd_text.strip():
-        print("❌ No job description provided. Exiting.")
+    if len(jd_text.strip()) < MIN_JD_CHARS:
+        print("❌ No usable job description (empty or too short). "
+              "Paste the full posting into jd.txt or pass --jd.")
         sys.exit(1)
 
     # ── 2. Parse JD ──────────────────────────────────────────────────────────
@@ -154,31 +173,23 @@ def main():
     selected = select_all(jd_parsed)
 
     # ── 4. Tailor with Ollama (unless --no-ai) ───────────────────────────────
+    final_content = selected
     if args.no_ai:
         print("\n⚡ Skipping AI tailoring (--no-ai flag set)")
-        # Use selected bullets as-is, generate basic summary
-        selected["summary"] = (
-            f"M.S. Engineering Data Science candidate with hands-on experience in "
-            f"{', '.join(jd_parsed['keywords'][:5])}. "
-            f"Proven track record building production-grade AI systems — NIST-certified face recognition "
-            f"(global ranking 125/190), deployed multi-agent platforms, and optimized ML pipelines. "
-            f"Proficient in Python, PyTorch, TensorFlow, SQL, and cloud deployment."
-        )
-        final_content = selected
+        selected["summary"] = build_fallback_summary(selected, jd_parsed["keywords"])
     else:
         try:
-            from modules.ollama_tailor import tailor_content
-            print("\n🤖 Tailoring with Ollama (Mistral)...")
-            final_content = tailor_content(selected, jd_parsed)
+            from modules import ollama_tailor
+            if args.model:
+                ollama_tailor.set_model(args.model)
+            print(f"\n🤖 Tailoring with Ollama ({ollama_tailor.MODEL})...")
+            final_content = ollama_tailor.tailor_content(selected, jd_parsed)
+        except ollama_tailor.OllamaError as e:
+            print(f"\n⚠️  {e}\n   Falling back to rule-based selection (same as --no-ai).")
+            selected["summary"] = build_fallback_summary(selected, jd_parsed["keywords"])
         except Exception as e:
-            print(f"\n⚠️  Ollama tailoring failed ({e}). Falling back to rule-based selection.")
-            selected["summary"] = (
-                f"M.S. Engineering Data Science candidate with hands-on experience in "
-                f"{', '.join(jd_parsed['keywords'][:5])}. "
-                f"Proven track record building production-grade AI systems achieving NIST FRVT global "
-                f"ranking (125/190), deploying multi-agent AI platforms, and optimizing ML pipelines "
-                f"for 25% latency reduction. Skilled in Python, PyTorch, SQL, and cloud deployment."
-            )
+            print(f"\n⚠️  Tailoring failed unexpectedly ({e!r}). Falling back to rule-based selection.")
+            selected["summary"] = build_fallback_summary(selected, jd_parsed["keywords"])
             final_content = selected
 
     # ── 5. Render PDF ────────────────────────────────────────────────────────

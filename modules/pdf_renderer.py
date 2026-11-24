@@ -211,15 +211,16 @@ def _section_hdr(title: str, styles: dict, s: float = 1.0) -> list:
 
 
 def _trim(text: str, max_chars: int = 290) -> str:
-    """Hard-cap bullet length. Cuts at sentence boundary within max_chars."""
+    """Hard-cap bullet length, cutting at a clause boundary and closing with a period."""
+    text = text.strip()
     if len(text) <= max_chars:
         return text
     cut = text[:max_chars]
-    for sep in (". ", "; ", ", "):
+    for sep in (". ", "; ", ", ", " "):
         idx = cut.rfind(sep)
         if idx > max_chars * 0.6:
-            return cut[:idx + 1].rstrip()
-    return cut.rstrip() + "…"
+            return cut[:idx].rstrip(" ,;:—-") + "."
+    return cut.rstrip(" ,;:—-") + "."
 
 
 def _bold_keywords(text: str, keywords: list) -> str:
@@ -363,40 +364,61 @@ def _count_pages(story: list, s: float) -> int:
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
+MIN_SCALE = 0.80      # hard floor — below this text becomes hard to read / ATS-unfriendly
+SCALE_STEP = 0.03
+
+
+def fit_scale(content: dict) -> float | None:
+    """Largest scale in [MIN_SCALE, 1.0] at which content fits one page, or None."""
+    scale = 1.0
+    while scale >= MIN_SCALE - 1e-9:
+        story = _build_story(content, _make_styles(scale), scale)
+        if _count_pages(story, scale) <= 1:
+            return scale
+        scale = round(scale - SCALE_STEP, 2)
+    return None
+
+
+def _shrink_content(content: dict) -> bool:
+    """Drop the least relevant material (last project's last bullet, then the project). False if nothing left to cut."""
+    projects = content.get("projects", [])
+    if not projects:
+        return False
+    last = projects[-1]
+    if len(last["star_bullets"]) > 2:
+        last["star_bullets"] = last["star_bullets"][:-1]
+    elif len(projects) > 1:
+        projects.pop()
+    else:
+        return False
+    return True
+
+
 def render_pdf(content: dict, output_path: str) -> str:
     """
-    Guarantees single-page output via auto-scaling (3% steps).
-    Base: 9.2pt Times body text. Hard floor: 0.80 (≈ 7.4pt).
-    The _count_pages probe uses a temp file so BaseDocTemplate works correctly.
+    Guarantees single-page output: auto-scales fonts down to MIN_SCALE; if the content
+    still overflows, trims the lowest-ranked project bullets/projects until it fits.
     """
+    import copy
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
-    scale     = 1.0
-    min_scale = 0.80      # hard floor — below this ATS scanners may struggle
-    step      = 0.03      # finer steps → more precise fit
+    content = copy.deepcopy(content)
+    scale = fit_scale(content)
+    trimmed = False
+    while scale is None and _shrink_content(content):
+        trimmed = True
+        scale = fit_scale(content)
+    if scale is None:
+        scale = MIN_SCALE
+        print("   ⚠️  Content could not be fit on one page even after trimming.")
+    elif trimmed:
+        print("   ✂️  Trimmed lowest-ranked project content to fit one page.")
 
-    while scale >= min_scale:
-        styles = _make_styles(scale)
-        story  = _build_story(content, styles, scale)
-        pages  = _count_pages(story, scale)
-
-        if pages <= 1:
-            break
-        scale = round(scale - step, 2)
-    else:
-        # If still >1 page at floor, force render at floor and warn
-        print("   ⚠️  Content is very long — forced to minimum scale. Consider trimming bullets.")
-
-    # Final render to disk at the scale that fits (or min_scale)
-    styles = _make_styles(scale)
-    story  = _build_story(content, styles, scale)
-
-    doc = _make_doc(output_path)
-    doc.build(story)
+    story = _build_story(content, _make_styles(scale), scale)
+    _make_doc(output_path).build(story)
 
     if scale < 1.0:
         print(f"   ℹ️  Content scaled to {scale:.0%} (body ≈ {9.2*scale:.1f}pt) to fit one page.")
     else:
         print(f"   ✅ Content fits at 100% (9.2pt Times body text).")
-
     return output_path

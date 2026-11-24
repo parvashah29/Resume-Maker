@@ -1,92 +1,48 @@
-# 🎯 Resume Tailoring Pipeline — Parva Shah
-> Local · No API Keys · Powered by Ollama (Mistral) · Guaranteed 1-page output
+# Resume Maker
 
----
+A local, offline resume-tailoring CLI. Paste a job description into `jd.txt`; it parses the JD, picks the best-matching content from `resume_data.json`, optionally has a local [Ollama](https://ollama.com) model reword it, and renders an ATS-friendly **one-page PDF** with reportlab. No API keys.
 
-## ⚡ Workflow (3 steps every time)
+`resume_data.json` holds the author's personal resume content (name, employers, projects, skills). That is intended: the tool is data-driven.
 
-### Step 1 — Paste the JD
-Open `jd.txt` (in this folder) and **replace everything** with the job description text.
-
-```
-resume_maker/
-└── jd.txt   ← paste JD here
-```
-
-### Step 2 — Run
-```bash
-cd "/Users/parvashah/Desktop/DS Projects/resume_maker"
-python3 generate.py
-```
-
-### Step 3 — Get your PDF
-```
-output/Parva_Shah_CompanyName_JobRole.pdf
-```
-
----
-
-## What Happens Under the Hood
-
-```
-jd.txt
-  → JD Parser        (extracts company, role, keywords)
-  → Content Selector (picks best work-exp bullets & title)
-  → Ollama / Mistral — 3 tasks:
-      1. Generates tailored 2-sentence Summary
-      2. Rewrites work-exp bullets with JD keywords
-      3. Generates 3 BRAND NEW projects from scratch for this specific JD
-  → PDF Renderer     (ATS-safe, single-column, auto-scales to 1 page)
-  → output/Parva_Shah_Company_Role.pdf
-```
-
----
-
-## Options
+## Setup (Python 3.10+, tested on 3.12 / macOS arm64)
 
 ```bash
-# Standard (AI-tailored, ~1 min):
-python3 generate.py
-
-# Fast — rule-based only, no Ollama needed (~1 sec):
-python3 generate.py --no-ai
-
-# Provide JD as a different file:
-python3 generate.py --jd path/to/other_jd.txt
-
-# Override auto-detected company or role name:
-python3 generate.py --company "Google" --role "ML Engineer Intern"
-
-# Specify custom output path:
-python3 generate.py --output ~/Desktop/my_resume.pdf
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt          # reportlab, pypdf
+pip install -r requirements-dev.txt      # only for tests (pytest)
+ollama pull mistral                      # only for AI mode
 ```
 
----
+## Use
 
-## FAQs
+```bash
+# 1. replace the contents of jd.txt with the job posting
+python generate.py                       # AI-tailored (about 1-1.5 min with mistral)
+python generate.py --no-ai               # rule-based only, about 1 second, no Ollama needed
+python generate.py --jd other.txt        # other file, or pass raw JD text
+python generate.py --model llama3.2      # choose model (or set RESUME_MAKER_MODEL)
+python generate.py --company "Acme" --role "ML Intern" --output ~/Desktop/r.pdf
+```
 
-**Q: Where do I paste the JD?**
-A: Open `jd.txt` in this folder. Delete everything and paste the raw JD text. Then run `python3 generate.py`.
+Output goes to `output/Parva_Shah_<Company>_<Role>.pdf` (folder is created automatically and git-ignored). If the company or role is misdetected, override with `--company` / `--role`.
 
-**Q: Projects keep repeating — is that normal?**
-A: No — every run generates 3 brand-new projects invented by Mistral specifically for the JD's keywords. They will be different each time and directly target the role.
+## How it works
 
-**Q: Company name detected wrong?**
-A: Add `--company "Actual Company Name"` to override: `python3 generate.py --company "OpenAI" --role "Research Intern"`
+1. `modules/jd_parser.py` extracts company, title, role category and keywords (JD input is cleaned and capped at 20,000 characters).
+2. `modules/content_selector.py` picks work-experience titles/bullets, the 3 best projects, coursework and skills from `resume_data.json`. Skills not supported by `resume_data.json` are dropped.
+3. `modules/ollama_tailor.py` (skipped with `--no-ai`) asks the model to reword the summary and bullets. It cannot add content: a rewritten bullet is kept only if it adds no new number and no new JD skill/term absent from the original; otherwise the original bullet is used. Malformed output is retried, then falls back to rule-based text. Skills are only reordered.
+4. `modules/pdf_renderer.py` shrinks fonts (down to 80%) and, if still too long, drops the lowest-ranked project content so the result is always exactly one page.
 
-**Q: PDF is 2 pages?**
-A: It won't be — auto-scaling reduces font sizes in 5% steps until it fits. If you see `ℹ️ Content scaled to X%` that's it working correctly.
+If Ollama is not running, the tool tries `ollama serve`. If Ollama or the model is missing, it prints how to fix it and falls back to `--no-ai` behaviour.
 
-**Q: How long does it take?**
-A: ~50–90 seconds with Ollama (AI mode). ~1 second with `--no-ai`.
+## Adapting it to someone else
 
-**Q: Does Ollama need to be running first?**
-A: No — the pipeline auto-starts it if it's not already running.
+Replace `resume_data.json` with your own content, keeping its structure: `personal`, `education` (with `coursework_pool`), `work_experience` (with `title_pool` and `bullets_pool` keyed by role category, plus `default`), `projects_pool`, `skills_pool`, `certifications`. To allow extra skills, list them under `skills_pool` (anything not found in the file is filtered out). The `Parva_Shah_` filename prefix lives in `generate.py` (`build_output_path`).
 
----
+## Tests
 
-## What Never Changes
-- Your name, phone, email, LinkedIn, GitHub
-- Company names in work experience
-- Education institutions and dates
-- Certifications
+```bash
+python -m pytest
+```
+
+Covers JD parsing, content selection and skill grounding, LLM-output validation/fallback, and one-page PDF fitting. Real-Ollama runs are manual.

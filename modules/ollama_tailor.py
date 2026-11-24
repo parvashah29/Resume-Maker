@@ -1,19 +1,42 @@
 """
 ollama_tailor.py
-Uses local Ollama (Mistral) to intelligently rewrite and tailor resume content.
-No API keys. Runs fully offline after Ollama is installed.
+Uses a local Ollama model to lightly rewrite resume content for a job description.
+
+Design rules (so the resume stays truthful):
+  * The LLM only REWORDS content that already exists in resume_data.json.
+    It never invents projects, employers, degrees, skills or numbers.
+  * Every LLM output is validated; anything malformed, empty or containing
+    numbers that were not in the source bullet is discarded and the original
+    (rule-selected) text is used instead.
+  * If Ollama is unavailable, OllamaError is raised and generate.py falls back
+    to the rule-based content.
 """
 from __future__ import annotations
 import json
+import os
 import re
+import shutil
 import subprocess
 import time
-import urllib.request
 import urllib.error
+import urllib.request
+
+from modules.content_selector import build_fallback_summary
+
+OLLAMA_BASE = os.environ.get("RESUME_MAKER_OLLAMA_URL", "http://localhost:11434").rstrip("/")
+DEFAULT_MODEL = "mistral:latest"
+MODEL = os.environ.get("RESUME_MAKER_MODEL", DEFAULT_MODEL)
+REQUEST_TIMEOUT = 180
+LLM_RETRIES = 2          # attempts per LLM task before falling back to source text
 
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "mistral:latest"
+class OllamaError(RuntimeError):
+    """Ollama is not reachable, or the requested model is not installed."""
+
+
+def set_model(name: str) -> None:
+    global MODEL
+    MODEL = name
 
 
 # ---------------------------------------------------------------------------
@@ -22,31 +45,51 @@ MODEL = "mistral:latest"
 
 def _is_ollama_running() -> bool:
     try:
-        urllib.request.urlopen("http://localhost:11434", timeout=2)
+        urllib.request.urlopen(OLLAMA_BASE, timeout=2)
         return True
     except Exception:
         return False
 
 
-def _start_ollama():
-    """Start Ollama server in background if not already running."""
+def _start_ollama() -> None:
+    """Try to start `ollama serve` in the background (only if the binary exists)."""
+    if not re.match(r"^https?://(localhost|127\.0\.0\.1)(:11434)?$", OLLAMA_BASE):
+        raise OllamaError(f"Ollama is not reachable at {OLLAMA_BASE}. Check RESUME_MAKER_OLLAMA_URL.")
+    if not shutil.which("ollama"):
+        raise OllamaError(
+            "Ollama is not installed. Install it from https://ollama.com, then run "
+            f"'ollama pull {MODEL}'. Or use --no-ai for rule-based tailoring without an LLM."
+        )
     print("⏳ Starting Ollama server...")
-    subprocess.Popen(
-        ["ollama", "serve"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
-    )
+    subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for _ in range(15):
         time.sleep(1)
         if _is_ollama_running():
             print("✅ Ollama is running.")
             return
-    raise RuntimeError("Could not start Ollama. Please run 'ollama serve' manually.")
+    raise OllamaError("Could not start Ollama. Please run 'ollama serve' in another terminal and retry.")
 
 
-def ensure_ollama():
+def _installed_models() -> list[str]:
+    with urllib.request.urlopen(f"{OLLAMA_BASE}/api/tags", timeout=5) as resp:
+        return [m.get("name", "") for m in json.loads(resp.read()).get("models", [])]
+
+
+def ensure_ollama() -> None:
+    """Make sure the server is up and the configured model is pulled; raise OllamaError otherwise."""
     if not _is_ollama_running():
         _start_ollama()
+    try:
+        names = _installed_models()
+    except Exception as e:
+        raise OllamaError(f"Ollama is running but its model list could not be read ({e}).")
+    wanted = MODEL if ":" in MODEL else MODEL + ":latest"
+    if wanted not in names and MODEL not in names:
+        have = ", ".join(names) or "none"
+        raise OllamaError(
+            f"Model '{MODEL}' is not installed (installed: {have}). Run 'ollama pull {MODEL}', "
+            "or pick another with --model / RESUME_MAKER_MODEL."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -55,344 +98,197 @@ def ensure_ollama():
 
 def _call_ollama(prompt: str, max_tokens: int = 1200) -> str:
     """Send a prompt to Ollama and return the response text."""
-    ensure_ollama()
     payload = json.dumps({
         "model": MODEL,
         "prompt": prompt,
         "stream": False,
-        "options": {
-            "temperature": 0.4,
-            "num_predict": max_tokens,
-            "top_p": 0.9
-        }
+        "options": {"temperature": 0.3, "num_predict": max_tokens, "top_p": 0.9},
     }).encode()
-
     req = urllib.request.Request(
-        OLLAMA_URL,
-        data=payload,
-        headers={"Content-Type": "application/json"}
+        f"{OLLAMA_BASE}/api/generate", data=payload,
+        headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        data = json.loads(resp.read())
-        return data.get("response", "").strip()
+    try:
+        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
+            return json.loads(resp.read()).get("response", "").strip()
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ConnectionError) as e:
+        raise OllamaError(f"Ollama request failed: {e}")
+
+
+def _call_validated(prompt: str, validate, max_tokens: int):
+    """Call the LLM up to LLM_RETRIES times; return validate(text) or None if it never validates."""
+    for attempt in range(1, LLM_RETRIES + 1):
+        text = _call_ollama(prompt, max_tokens=max_tokens)
+        result = validate(text)
+        if result:
+            return result
+        print(f"   ⚠️  Malformed LLM output (attempt {attempt}/{LLM_RETRIES}).")
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Validation helpers (pure, unit-tested)
+# ---------------------------------------------------------------------------
+
+_NUM = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def numbers_in(text: str) -> set[str]:
+    return set(_NUM.findall(text))
+
+
+def parse_bullets(text: str) -> list[str]:
+    """Extract bullet lines from LLM output, dropping markers, labels and tiny fragments."""
+    out = []
+    for line in text.splitlines():
+        line = re.sub(r"^\s*(?:[•\-\*]|\d+[.)])\s*", "", line.strip()).strip()
+        if len(line) > 20 and not line.lower().startswith(("here are", "here is", "sure")):
+            out.append(line)
+    return out
+
+
+def _norm(text: str) -> str:
+    return " " + re.sub(r"[^a-z0-9+#]+", " ", text.lower()).strip() + " "
+
+
+def jd_terms(jd_parsed: dict) -> set[str]:
+    """
+    Terms from the JD that the LLM might wrongly claim as the candidate's own:
+    parsed keywords, known tech names, and adjacent-word phrases (e.g. 'object detection').
+    """
+    from modules.jd_parser import STOP_WORDS, TECH_KEYWORDS
+    terms = {k.lower() for k in jd_parsed.get("keywords", []) if len(k) > 2}
+    terms |= {t for t in TECH_KEYWORDS if len(t) > 2}
+    run: list[str] = []
+    for tok in re.findall(r"[A-Za-z0-9+#]+|[.,;:!?()\n-]", jd_parsed.get("raw_text", "").lower()):
+        if re.match(r"[a-z0-9+#]{3,}$", tok) and tok not in STOP_WORDS:
+            run.append(tok)
+            if len(run) >= 2:
+                terms.add(f"{run[-2]} {run[-1]}")
+        else:
+            run = []
+    return terms
+
+
+def introduced_terms(text: str, source: str, terms: set[str]) -> list[str]:
+    """JD terms that appear in `text` but nowhere in the trusted `source` text."""
+    t, src = _norm(text), _norm(source)
+    return [x for x in terms if f" {_norm(x).strip()} " in t and f" {_norm(x).strip()} " not in src]
+
+
+def merge_bullets(originals: list[str], rewritten: list[str],
+                  terms: set[str] | None = None, context: str = "") -> list[str]:
+    """
+    Keep the rewrite at position i only if it introduces no new number and no new JD
+    term (skill/technology claim) beyond the original bullets; otherwise keep the original.
+    """
+    allowed = set()
+    for o in originals:
+        allowed |= numbers_in(o)
+    source = " ".join(originals) + " " + context
+    merged = []
+    for i, orig in enumerate(originals):
+        cand = rewritten[i] if i < len(rewritten) else None
+        if cand and terms and introduced_terms(cand, source, terms):
+            cand = None
+        if cand and numbers_in(cand) <= allowed and len(cand) <= 320:
+            merged.append(cand)
+        else:
+            merged.append(orig)
+    return merged
+
+
+def clean_summary(text: str, max_words: int = 90, allowed_numbers: set | None = None,
+                  terms: set[str] | None = None, source: str = "") -> str | None:
+    text = re.sub(r"^(Summary:|Here is|Here's|Sure[,:]?)[^\n]*?[:\n]\s*", "", text.strip(), flags=re.IGNORECASE)
+    text = text.strip().strip('"').strip()
+    text = re.sub(r"\s+", " ", text)
+    if len(text.split()) < 12 or len(text.split()) > max_words:
+        return None
+    if re.search(r"\b(I|my|me|we)\b", text):
+        return None
+    if allowed_numbers is not None and not numbers_in(text) <= allowed_numbers:
+        return None            # invented figure
+    if terms and introduced_terms(text, source, terms):
+        return None            # claims a JD skill/term that is nowhere in resume_data.json
+    return text
 
 
 # ---------------------------------------------------------------------------
 # Tailoring tasks
 # ---------------------------------------------------------------------------
 
-def generate_summary(
-    jd_text: str,
-    role_category: str,
-    selected_content: dict,
-    keywords: list[str],
-    job_title: str = "",
-    critical_keywords: list[str] = None
-) -> str:
-    """Generate a tailored professional summary — always includes job title for ATS."""
-    top_kws = ", ".join(keywords[:15])
-    crit = ", ".join((critical_keywords or [])[:6])
+def generate_summary(jd_text: str, selected_content: dict, keywords: list[str],
+                     job_title: str = "", terms: set[str] | None = None, source: str = "") -> str:
+    """LLM summary grounded in the real resume facts; deterministic fallback if it fails."""
     work = selected_content["work_experience"]
-    w1 = f"{work[0]['title']} at {work[0]['company']}"
-    w2 = f"{work[1]['title']} at {work[1]['company']}"
+    facts = "\n".join(f"- {w['title']} at {w['company']}: " + " ".join(w["bullets"][:2]) for w in work)
+    degree = selected_content["education"][0]["degree"] if selected_content.get("education") else ""
+    top_kws = ", ".join(keywords[:12])
+    title_rule = f'- Mention the target role "{job_title}" once.\n' if job_title else ""
 
-    title_instruction = ""
-    if job_title:
-        title_instruction = f"- MUST include the exact job title '{job_title}' in the summary (ATS requirement)"
+    prompt = f"""You are a professional resume writer. Write a 2-3 sentence professional summary (max 70 words).
 
-    crit_instruction = ""
-    if crit:
-        crit_instruction = f"- MUST naturally include these high-priority ATS keywords: {crit}"
+RULES:
+- No first-person pronouns (I, my, me, we).
+- Use ONLY the facts below. The candidate is a current student, not a graduate; use the degree wording exactly. Do NOT invent employers, schools, degrees, skills, projects or numbers.
+{title_rule}- The job description describes the EMPLOYER's needs, not the candidate. Mention a JD keyword only if the facts below support it; never claim a skill, tool or experience that is not in the facts.
+- JD keywords (use only if supported): {top_kws}
+- Output ONLY the summary text.
 
-    prompt = f"""You are a professional resume writer. Write a 3-sentence professional summary (max 80 words total).
+CANDIDATE FACTS:
+- Degree: {degree}
+{facts}
 
-RULES — STRICTLY FOLLOW:
-- Do NOT use first-person pronouns (I, my, me, we)
-- Do NOT invent companies, schools, or experiences not provided
-{title_instruction}
-{crit_instruction}
-- Mention: M.S. Engineering Data Science student, experience at {work[0]['company']} and {work[1]['company']}
-- MUST include the phrase "applied machine learning" at least once
-- MUST use the phrase "recommender systems" (plural, not singular) at least once
-- Weave in these JD keywords naturally: {top_kws}
-- Be specific and results-oriented
-- Exactly 3 sentences, MAX 80 words total
-- Output ONLY the summary text, no labels or quotes
-
-JOB DESCRIPTION (first 700 chars):
+JOB DESCRIPTION (excerpt):
 {jd_text[:700]}
 
-OUTPUT (3 sentences, max 75 words):"""
+SUMMARY:"""
+    allowed = numbers_in(" ".join(b for w in work for b in w["bullets"]) + " " + degree + " " + job_title)
+    summary = _call_validated(prompt, lambda t: clean_summary(t, allowed_numbers=allowed, terms=terms, source=source), max_tokens=250)
+    if not summary:
+        print("   ⚠️  Using rule-based summary.")
+        return build_fallback_summary(selected_content, keywords)
 
-    result = _call_ollama(prompt, max_tokens=250)
-    # Strip LLM preamble
-    result = re.sub(r"^(Summary:|Here is|Here's|Sure[,:]?)\s*", "", result, flags=re.IGNORECASE).strip().strip('"')
-
-    # ── Post-process: guarantee job title appears ───────────────────────────
-    if job_title and job_title.lower() not in result.lower():
-        # Inject naturally: "[Title] and M.S. candidate..." or prepend
-        if result.lower().startswith("m.s."):
-            result = f"{job_title} and {result[0].lower()}{result[1:]}"
-        else:
-            result = f"Aspiring {job_title} — {result}"
-        print(f"   ✅ Job title '{job_title}' injected into summary.")
-
-    return result
+    if job_title and job_title.lower() not in summary.lower():
+        summary = f"Aspiring {job_title} — {summary[0].lower()}{summary[1:]}" \
+            if not summary.startswith(("M.S.", "MS")) else f"Aspiring {job_title} — {summary}"
+    return summary
 
 
-def rewrite_bullets(
-    bullets: list[str],
-    jd_text: str,
-    keywords: list[str],
-    company: str,
-    title: str,
-    critical_keywords: list[str] = None
-) -> list[str]:
-    """
-    Rewrite work experience bullets with JD keywords.
-    critical_keywords are ATS-gap terms that MUST appear.
-    """
-    top_kws = ", ".join(keywords[:20])
+def _rewrite(bullets: list[str], header: str, keywords: list[str], terms: set[str] | None = None,
+             extra_rules: str = "") -> list[str]:
+    """Rewrite bullets with JD keywords; numbers and facts are validated afterwards."""
+    top_kws = ", ".join(keywords[:15])
     bullets_text = "\n".join(f"- {b}" for b in bullets)
-    crit = ", ".join((critical_keywords or [])[:8])
-    crit_instruction = f"- MUST naturally use these high-priority ATS gap keywords across the 3 bullets: {crit}" if crit else ""
+    n = len(bullets)
+    prompt = f"""You are a professional resume writer. Rewrite exactly {n} resume bullet points.
 
-    prompt = f"""You are a professional resume writer. Rewrite exactly 3 bullet points for a work experience entry.
+RULES:
+- Output EXACTLY {n} bullets, each on one line starting with "•", same order as the originals.
+- Keep every number, percentage and ranking unchanged. Do NOT add new numbers, tools, employers or claims.
+- Reword with these JD keywords only where they honestly fit the original: {top_kws}
+- Strong action verb first; each bullet under 280 characters.
+{extra_rules}
+{header}
 
-RULES — STRICTLY FOLLOW:
-- Output EXACTLY 3 bullets — no more, no less
-- Keep company name exactly: "{company}"
-- Keep ALL numbers/percentages/rankings unchanged — they are facts
-- Incorporate these JD keywords naturally: {top_kws}
-{crit_instruction}
-- IMPORTANT PHRASING: always use "recommender systems" (plural), "applied machine learning", "representation learning"
-- Each bullet: strong action verb → specific technical work → measurable result with a number
-- Each bullet should be 1–2 lines, impactful and detailed (160–220 characters)
-- Use collaborative, research-oriented language where appropriate
-- Do NOT add fake numbers or experiences
-- Output ONLY 3 bullet lines starting with "•", nothing else
-
-ROLE: {title} at {company}
-
-ORIGINAL BULLETS (use as basis, rewrite with JD focus):
+ORIGINAL BULLETS:
 {bullets_text}
 
-JD KEYWORDS: {top_kws}
-
-REWRITTEN BULLETS (exactly 3, each starting with •):"""
-
-    result = _call_ollama(prompt, max_tokens=500)
-
-    # Parse output
-    lines = [l.strip() for l in result.split("\n") if l.strip()]
-    rewritten = []
-    for line in lines:
-        # Strip bullet markers
-        line = re.sub(r"^[•\-\*]\s*", "", line).strip()
-        if len(line) > 20:
-            rewritten.append(line)
-
-    # Fallback: if rewrite failed or produced too few, use originals
-    if len(rewritten) < 3:
-        rewritten = rewritten + bullets[:3][len(rewritten):]
-
-    return rewritten[:3]
+REWRITTEN BULLETS:"""
+    parsed = _call_validated(prompt, lambda t: parse_bullets(t) if len(parse_bullets(t)) >= n else None,
+                             max_tokens=700)
+    return merge_bullets(bullets, parsed, terms, context=header) if parsed else bullets
 
 
-def rewrite_project_bullets(
-    project: dict,
-    jd_text: str,
-    keywords: list[str]
-) -> list[str]:
-    """
-    Rewrite project bullets to embed JD keywords while preserving STAR structure.
-    """
-    top_kws = ", ".join(keywords[:15])
-    bullets_text = "\n".join(f"- {b}" for b in project["star_bullets"])
-
-    prompt = f"""You are a professional resume writer. Rewrite exactly 3 bullet points for a technical project on a resume.
-
-RULES — STRICTLY FOLLOW:
-- Output EXACTLY 3 bullets — no more, no less
-- Keep ALL numbers/percentages/rankings unchanged — they are facts
-- Incorporate these JD keywords naturally: {top_kws}
-- Bullet 1: situation/problem + technical action
-- Bullet 2: implementation details with specific technologies
-- Bullet 3: measurable result (%, time saved, accuracy, users, etc.)
-- Each bullet MUST be under 180 characters — concise and punchy
-- Do NOT invent new numbers or technologies
-- Output ONLY 3 bullet lines starting with "•", nothing else
-
-PROJECT: {project['name']}
-TECH: {project['tech']}
-
-ORIGINAL BULLETS (pick best 3):
-{bullets_text}
-
-RESUME KEYWORDS: {top_kws}
-
-REWRITTEN BULLETS (exactly 3, each starting with •, each under 180 chars):"""
-
-    result = _call_ollama(prompt, max_tokens=400)
-
-    lines = [l.strip() for l in result.split("\n") if l.strip()]
-    rewritten = []
-    for line in lines:
-        line = re.sub(r"^[•\-\*]\s*", "", line).strip()
-        if len(line) > 20:
-            rewritten.append(line)
-
-    if len(rewritten) < 3:
-        rewritten = rewritten + project["star_bullets"][:3][len(rewritten):]
-
-    return rewritten
+def rewrite_bullets(bullets: list[str], keywords: list[str], company: str, title: str,
+                    terms: set[str] | None = None) -> list[str]:
+    return _rewrite(bullets, f"ROLE: {title} at {company} (do not change the company name)", keywords, terms)
 
 
-def generate_projects(
-    jd_text: str,
-    keywords: list[str],
-    role_category: str,
-    candidate_skills: dict,
-    critical_keywords: list[str] = None
-) -> list[dict]:
-    """
-    Generate 3 BRAND NEW projects from scratch using Mistral, tailored to this JD.
-    Not selected from a fixed pool — invented fresh every time.
-    """
-    top_kws = ", ".join(keywords[:20])
-
-    langs  = candidate_skills.get("Languages", "Python, SQL, JavaScript, TypeScript, R")
-    ml     = candidate_skills.get(
-        "ML & AI Frameworks",
-        candidate_skills.get("ML & Statistical Methods",
-        candidate_skills.get("ML & Frameworks", "PyTorch, TensorFlow, Scikit-learn")))
-    cloud  = candidate_skills.get(
-        "Cloud & DevOps",
-        candidate_skills.get("Cloud & Tools", "AWS, GCP, Docker, Git, Linux"))
-
-    crit = ", ".join((critical_keywords or [])[:6])
-    research_kw = "recommender systems, representation learning, research, applied machine learning"
-    must_use = f"Include these keywords naturally across the 3 projects: {research_kw}" + (f", {crit}" if crit else "") + "."
-
-    # ── Simplified prompt — complex nested rules confuse Mistral 7B ──────────
-    prompt = f"""Write exactly 3 technical resume project entries in this EXACT format.
-
-Tech stack to use (ONLY these):
-Languages: {langs}
-ML/AI: {ml}
-Tools: {cloud}, Flask, FastAPI, Streamlit, PostgreSQL, MongoDB, Pandas, NumPy, Plotly, LangChain, spaCy
-
-{must_use}
-Target these JD keywords: {top_kws}
-
-Rules:
-- Each project is a solo personal/academic project (no company names)
-- Bullet 1: describe the real-world problem and what you designed (include scale e.g. N users/records)
-- Bullet 2: your technical implementation — specific tools, model type, technique
-- Bullet 3: quantified result with % improvement AND comparison baseline (vs. X method/baseline)
-- Realistic numbers only (20-45% improvement, 75-93% accuracy) — no 99%+ claims
-- Bullets under 220 characters each
-
-OUTPUT FORMAT — follow exactly, blank line between projects:
-PROJECT: <title>
-TECH: <4-7 tools>
-• <bullet 1 — situation/task>
-• <bullet 2 — action/implementation>
-• <bullet 3 — result with number and baseline>
-
-JD keywords context:
-{jd_text[:550]}
-
-Write the 3 projects:"""
-
-    result = _call_ollama(prompt, max_tokens=1100)
-
-    # ── Hardened parser: handles Mistral's common output variants ─────────────
-    projects = []
-
-    # Split on blank lines OR on PROJECT: markers
-    proj_sections = re.split(
-        r"\n(?=PROJECT\s*:|Project\s+\d+\s*:)",
-        result.strip(), flags=re.IGNORECASE
-    )
-    if len(proj_sections) <= 1:
-        proj_sections = re.split(r"\n{2,}", result.strip())
-
-    for block in proj_sections:
-        block = block.strip()
-        if not block:
-            continue
-
-        lines = [l.strip() for l in block.splitlines() if l.strip()]
-        name, tech, bullets = "", "", []
-
-        for line in lines:
-            if re.match(r"^(PROJECT|Project\s*\d*)\s*:", line, re.IGNORECASE):
-                name = re.sub(r"^(PROJECT|Project\s*\d*)\s*:\s*", "", line, flags=re.IGNORECASE).strip()
-            elif re.match(r"^(TECH|Technologies?|Tech\s*Stack)\s*:", line, re.IGNORECASE):
-                tech = re.sub(r"^(TECH|Technologies?|Tech\s*Stack)\s*:\s*", "", line, flags=re.IGNORECASE).strip()
-            elif re.match(r"^[•\-\*]\s*|\d[\.\)]\s+", line):
-                # Strip bullet marker then strip STAR labels if present
-                bullet = re.sub(r"^[•\-\*]\s*|\d[\.\)]\s+", "", line).strip()
-                bullet = re.sub(r"^(Situation|Task|Action|Result)\s*:\s*", "", bullet, flags=re.IGNORECASE).strip()
-                if len(bullet) > 20:
-                    bullets.append(bullet)
-
-        # Fallback: if name not found via PROJECT:, use first substantial line
-        if not name:
-            for line in lines:
-                if len(line) > 10 and not re.match(r"^(TECH|•|\-|\*|\d|Write|PROJECT)", line, re.IGNORECASE):
-                    name = line.strip()
-                    break
-        if not tech and len(lines) > 1:
-            for line in lines[:4]:
-                if re.search(r"Python|PyTorch|SQL|TensorFlow|Flask|Scikit", line, re.IGNORECASE):
-                    tech = line.strip()
-                    break
-
-        if name and bullets:
-            if not tech:
-                tech = "Python, PyTorch, SQL, Pandas, NumPy"
-            while len(bullets) < 3:
-                bullets.append(
-                    f"Achieved significant performance improvement over baseline "
-                    f"using {tech.split(',')[0].strip()} and data-driven methods."
-                )
-            projects.append({"name": name, "tech": tech, "star_bullets": bullets[:3]})
-
-        if len(projects) >= 3:
-            break
-
-    if len(projects) < 3:
-        print(f"   ⚠️  Project generation returned {len(projects)}/3 — pool fallback for remaining.")
-
-    return projects
-
-
-def _rewrite_pool_project(project: dict, jd_text: str, keywords: list[str]) -> dict:
-    """Fallback: rewrite a pool project's bullets with JD keywords."""
-    top_kws = ", ".join(keywords[:15])
-    bullets_text = "\n".join(f"- {b}" for b in project["star_bullets"])
-
-    prompt = f"""Rewrite exactly 3 resume bullet points for this project. Output ONLY 3 lines starting with •.
-Keep all numbers unchanged. Each bullet under 180 chars. Weave in: {top_kws}
-
-PROJECT: {project['name']} | TECH: {project['tech']}
-ORIGINAL:
-{bullets_text}
-
-REWRITTEN (exactly 3 bullets starting with •):"""
-
-    result = _call_ollama(prompt, max_tokens=400)
-    lines = [l.strip() for l in result.split("\n") if l.strip()]
-    rewritten = []
-    for line in lines:
-        line = re.sub(r"^[•\-\*]\s*", "", line).strip()
-        if len(line) > 20:
-            rewritten.append(line)
-    if len(rewritten) < 3:
-        rewritten = rewritten + project["star_bullets"][:3][len(rewritten):]
-    return {**project, "star_bullets": rewritten[:3]}
+def rewrite_project_bullets(project: dict, keywords: list[str], terms: set[str] | None = None) -> list[str]:
+    return _rewrite(project["star_bullets"], f"PROJECT: {project['name']}\nTECH: {project['tech']}",
+                    keywords, terms)
 
 
 def _extract_critical_keywords(jd_text: str, keywords: list[str]) -> list[str]:
@@ -426,138 +322,68 @@ def _extract_critical_keywords(jd_text: str, keywords: list[str]) -> list[str]:
     return [p for _, p in found[:12]]
 
 
-def _ensure_critical_keywords(content: dict, critical_keywords: list, job_title: str = "") -> dict:
-    """
-    Post-processing safety net — after all LLM calls, scan the FULL generated
-    text. For any critical keyword appearing 0 times, inject it into the summary.
-    This guarantees minimum keyword presence regardless of LLM compliance.
-    """
-    # Build full text snapshot
-    full_text = content.get("summary", "").lower()
-    for exp in content.get("work_experience", []):
-        for b in exp.get("bullets", []):
-            full_text += " " + b.lower()
-    for proj in content.get("projects", []):
-        full_text += " " + proj.get("name", "").lower()
-        for b in proj.get("star_bullets", []):
-            full_text += " " + b.lower()
-    for cat, val in content.get("skills", {}).items():
-        full_text += " " + val.lower()
-
-    # Find completely missing critical keywords
-    missing = [kw for kw in (critical_keywords or []) if kw.lower() not in full_text]
-
-    if missing:
-        missing_str = ", ".join(missing[:6])
-        print(f"   💉 Injecting {len(missing)} missing ATS keywords: {missing_str}")
-        # Append as a natural addendum sentence to the summary
-        summary = content.get("summary", "").rstrip(".")
-        content["summary"] = (
-            summary
-            + f". Hands-on experience with {missing_str} applied"
-              f" to real-world research and production ML systems."
-        )
-    else:
-        print("   ✅ All critical ATS keywords present in resume text.")
-
-    return content
-
-
 def _tailor_skills(skills: dict, keywords: list, critical_keywords: list) -> dict:
     """
-    Deterministically re-order and enrich the skills section — no LLM needed.
-    1. Within each category, surfaces items matching JD keywords first.
-    2. Injects missing critical domain terms into the 'ML Concepts' category.
+    Deterministically re-order skills so JD-matching items come first.
+    Never adds skills: the set of items is unchanged.
     """
+    from modules.content_selector import split_skill_items
     all_kw = {kw.lower() for kw in (keywords or []) + (critical_keywords or [])}
-
     tailored = {}
     for category, value in skills.items():
-        if not value:
+        items = split_skill_items(value)
+        if not items:
             continue
-        items = [item.strip() for item in value.split(",") if item.strip()]
-        # Priority items = those matching any JD keyword
         priority = [it for it in items if any(kw in it.lower() for kw in all_kw)]
-        rest     = [it for it in items if it not in priority]
+        rest = [it for it in items if it not in priority]
         tailored[category] = ", ".join(priority + rest)
-
-    # Inject missing critical ML concepts into the ML Concepts & Methods category
-    concepts_key = next(
-        (k for k in tailored if "concept" in k.lower() or "method" in k.lower()), None
-    )
-    if concepts_key:
-        existing_lower = tailored[concepts_key].lower()
-        to_inject = []
-        for kw in (critical_keywords or []):
-            # Only inject if: domain concept (len>4), not already present
-            if len(kw) > 4 and kw.lower() not in existing_lower:
-                # Title-case for readability in the skills row
-                to_inject.append(kw.title())
-        if to_inject:
-            tailored[concepts_key] = tailored[concepts_key] + ", " + ", ".join(to_inject[:4])
-
     return tailored
 
 
 def tailor_content(selected_content: dict, jd_parsed: dict) -> dict:
     """
-    Main entry point: takes selected content + parsed JD,
-    returns fully tailored content dict ready for PDF rendering.
+    Main entry point: takes selected content + parsed JD and returns tailored content.
+    Raises OllamaError if Ollama/model is unavailable; individual task failures
+    fall back to the rule-selected text.
     """
-    jd_text   = jd_parsed["raw_text"]
-    keywords  = jd_parsed["keywords"]
-    role_cat  = jd_parsed["role_category"]
+    ensure_ollama()
+    jd_text = jd_parsed["raw_text"]
+    keywords = jd_parsed["keywords"]
     job_title = jd_parsed.get("job_title", "")
+    critical = _extract_critical_keywords(jd_text, keywords)
+    terms = jd_terms(jd_parsed)
+    from modules.content_selector import _load_data
+    resume_blob = json.dumps(_load_data(), ensure_ascii=False)
+    summary_source = f"{resume_blob} {job_title} {jd_parsed.get('company', '')}"
 
-    # Identify ATS gap keywords that need higher frequency
-    critical_keywords = _extract_critical_keywords(jd_text, keywords)
-    if critical_keywords:
-        print(f"   🎯 Critical ATS keywords: {', '.join(critical_keywords[:6])}")
+    def safe(task, fallback, *a, **kw):
+        try:
+            return task(*a, **kw)
+        except OllamaError as e:
+            print(f"   ⚠️  {e} — keeping original text for this section.")
+            return fallback
 
     print("🤖 Generating tailored summary...")
-    summary = generate_summary(
-        jd_text, role_cat, selected_content, keywords,
-        job_title=job_title,
-        critical_keywords=critical_keywords
-    )
+    summary = safe(generate_summary, build_fallback_summary(selected_content, keywords),
+                   jd_text, selected_content, keywords, job_title=job_title,
+                   terms=terms, source=summary_source)
 
     print("📝 Rewriting work experience bullets...")
-    tailored_work = []
+    work = []
     for exp in selected_content["work_experience"]:
-        rewritten = rewrite_bullets(
-            exp["bullets"], jd_text, keywords,
-            exp["company"], exp["title"],
-            critical_keywords=critical_keywords
-        )
-        tailored_work.append({**exp, "bullets": rewritten})
+        new = safe(rewrite_bullets, exp["bullets"], exp["bullets"], keywords, exp["company"], exp["title"], terms)
+        work.append({**exp, "bullets": new})
 
-    print("🚀 Generating fresh projects for this JD...")
-    fresh_projects = generate_projects(
-        jd_text, keywords, role_cat, selected_content["skills"],
-        critical_keywords=critical_keywords
-    )
+    print("🚀 Rewriting project bullets...")
+    projects = []
+    for proj in selected_content["projects"]:
+        new = safe(rewrite_project_bullets, proj["star_bullets"], proj, keywords, terms)
+        projects.append({**proj, "star_bullets": new})
 
-    # If generation produced fewer than 3, top up from selected pool
-    if len(fresh_projects) < 3:
-        pool_projects = selected_content["projects"]
-        for proj in pool_projects:
-            if len(fresh_projects) >= 3:
-                break
-            fresh_projects.append(_rewrite_pool_project(proj, jd_text, keywords))
-
-    # ── Tailor skills section (deterministic — no LLM needed) ─────────────
-    tailored_skills = _tailor_skills(selected_content["skills"], keywords, critical_keywords)
-
-    result = {
+    return {
         **selected_content,
         "summary": summary,
-        "work_experience": tailored_work,
-        "projects": fresh_projects[:3],
-        "skills": tailored_skills,
+        "work_experience": work,
+        "projects": projects,
+        "skills": _tailor_skills(selected_content["skills"], keywords, critical),
     }
-
-    # ── Safety net: guarantee all critical keywords appear ─────────────────
-    print("🔍 Verifying ATS keyword coverage...")
-    result = _ensure_critical_keywords(result, critical_keywords, job_title)
-
-    return result

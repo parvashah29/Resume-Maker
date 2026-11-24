@@ -13,8 +13,35 @@ DATA_PATH = Path(__file__).parent.parent / "resume_data.json"
 
 
 def _load_data() -> dict:
-    with open(DATA_PATH) as f:
+    with open(DATA_PATH, encoding="utf-8") as f:
         return json.load(f)
+
+
+_ITEM_SPLIT = re.compile(r",\s*(?![^()]*\))")   # split on commas outside parentheses
+_ALIASES = {"huggingface transformers": "transformers (huggingface)"}
+
+
+def split_skill_items(value: str) -> list[str]:
+    return [i.strip() for i in _ITEM_SPLIT.split(value) if i.strip()]
+
+
+def _skill_is_grounded(item: str, blob: str) -> bool:
+    """True if a skill is supported by resume_data.json (any text, or skills_pool.additional)."""
+    low = item.lower().strip()
+    low = _ALIASES.get(low, low)
+    base = low.split("(")[0].strip()
+    return low in blob or (len(base) > 1 and base in blob)
+
+
+def ground_skills(skills: dict, data: dict) -> dict:
+    """Drop any skill not backed by resume_data.json so tailoring never invents skills."""
+    blob = json.dumps(data, ensure_ascii=False).lower()
+    out = {}
+    for cat, value in skills.items():
+        kept = [i for i in split_skill_items(value) if _skill_is_grounded(i, blob)]
+        if kept:
+            out[cat] = ", ".join(kept)
+    return out
 
 
 def _keyword_score(text: str, keywords: list[str]) -> float:
@@ -265,7 +292,7 @@ def build_skills_section(keywords: list[str], role_category: str) -> dict:
         skills["Libraries & Tools"] = ", ".join(lib_skills)
         skills["Databases"] = ", ".join(db_skills)
 
-    return skills
+    return ground_skills(skills, data)
 
 
 
@@ -308,3 +335,25 @@ def select_all(jd_parsed: dict) -> dict:
         "certifications": data["certifications"],
         "jd_info": jd_parsed
     }
+
+
+def build_fallback_summary(content: dict, keywords: list[str]) -> str:
+    """Deterministic summary built only from resume_data.json facts (no LLM)."""
+    edu = content.get("education") or [{}]
+    degree = edu[0].get("degree", "").strip()
+    roles = [f"{w['title']} at {w['company']}" for w in content.get("work_experience", [])[:2]]
+    items = [i for v in content.get("skills", {}).values() for i in split_skill_items(v)]
+    wanted = {k.lower() for k in keywords if len(k) > 2}
+    skills = [i for i in items if i.lower().split(" (")[0] in wanted][:5]
+    parts = []
+    if degree:
+        parts.append(f"{degree} candidate")
+    else:
+        parts.append("Candidate")
+    if roles:
+        parts[0] += " with experience as " + " and ".join(roles) + "."
+    else:
+        parts[0] += "."
+    if skills:
+        parts.append("Skilled in " + ", ".join(skills) + ".")
+    return " ".join(parts)

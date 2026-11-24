@@ -31,3 +31,4 @@ uploads/
 output/
 prev_tailored_resume/
 ATS Reports/
+.pytest_cache/
